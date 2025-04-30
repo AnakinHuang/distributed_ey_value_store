@@ -9,4 +9,5 @@ add_executable(csc458_final_project
         src/message.hpp
         src/lamport.hpp
         src/kv_store.hpp
+        tests/test_kv_store.cpp
 )

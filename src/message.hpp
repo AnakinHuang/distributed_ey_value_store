@@ -9,43 +9,60 @@
 #define MESSAGE_HPP
 
 #include <string>
+#include <sstream>
+#include <cstdint>
 
-using namespace std;
+// Types of messages exchanged between client and replicas
+enum class MessageType {
+    PUT_REQUEST = 0,
+    GET_REQUEST,
+    MULTICAST_OP,
+    ACK,
+    COMMIT,
+    GET_RESPONSE
+};
 
+// Generic message struct with basic serialization/deserialization
 struct Message {
-    string op_type;    // "PUT" or "GET"
-    string key;
-    string value;
-    int lamport_ts{};
-    int sender_id{};
-    string op_id;
+    MessageType type;
+    std::string key;
+    std::string value;
+    uint64_t timestamp;       // Lamport timestamp or logical time
+    std::string client_id;    // Identifier for the client
+    std::string replica_id;   // Identifier for the replica (for ACKs)
+    std::string op_id;        // Unique operation ID
 
-    [[nodiscard]] string serialize() const {
-        return op_type + ":" + key + ":" + value + ":" +
-               to_string(lamport_ts) + ":" + to_string(sender_id) + ":" + op_id;
+    // Serialize to a delimited string
+    std::string serialize() const {
+        std::ostringstream oss;
+        oss << static_cast<int>(type) << '|'             // message type
+            << key << '|'                                 // key
+            << value << '|'                               // value
+            << timestamp << '|'                           // timestamp
+            << client_id << '|'                           // client ID
+            << replica_id << '|'                          // replica ID
+            << op_id;                                     // operation ID
+        return oss.str();
     }
 
-    static Message deserialize(const string& data) {
+    // Deserialize from a delimited string
+    static Message deserialize(const std::string& data) {
         Message msg;
-        size_t pos = 0, prev = 0;
-        int count = 0;
-        string fields[6];
+        std::istringstream iss(data);
+        std::string token;
 
-        while ((pos = data.find(':', prev)) != string::npos && count < 5) {
-            fields[count++] = data.substr(prev, pos - prev);
-            prev = pos + 1;
-        }
-        fields[5] = data.substr(prev);
-
-        msg.op_type = fields[0];
-        msg.key = fields[1];
-        msg.value = fields[2];
-        msg.lamport_ts = stoi(fields[3]);
-        msg.sender_id = stoi(fields[4]);
-        msg.op_id = fields[5];
+        std::getline(iss, token, '|');
+        msg.type = static_cast<MessageType>(std::stoi(token));
+        std::getline(iss, msg.key, '|');
+        std::getline(iss, msg.value, '|');
+        std::getline(iss, token, '|');
+        msg.timestamp = std::stoull(token);
+        std::getline(iss, msg.client_id, '|');
+        std::getline(iss, msg.replica_id, '|');
+        std::getline(iss, msg.op_id, '|');
 
         return msg;
     }
 };
 
-#endif
+#endif // MESSAGE_HPP

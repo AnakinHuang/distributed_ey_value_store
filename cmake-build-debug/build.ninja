@@ -61,6 +61,12 @@ build CMakeFiles/csc458_final_project.dir/src/client.cpp.obj: CXX_COMPILER__csc4
   OBJECT_DIR = CMakeFiles\csc458_final_project.dir
   OBJECT_FILE_DIR = CMakeFiles\csc458_final_project.dir\src
 
+build CMakeFiles/csc458_final_project.dir/tests/test_kv_store.cpp.obj: CXX_COMPILER__csc458_final_project_unscanned_Debug C$:/Users/85369/CLionProjects/csc458_final_project/tests/test_kv_store.cpp || cmake_object_order_depends_target_csc458_final_project
+  DEP_FILE = CMakeFiles\csc458_final_project.dir\tests\test_kv_store.cpp.obj.d
+  FLAGS = -g -std=gnu++20 -fdiagnostics-color=always
+  OBJECT_DIR = CMakeFiles\csc458_final_project.dir
+  OBJECT_FILE_DIR = CMakeFiles\csc458_final_project.dir\tests
+
 
 # =============================================================================
 # Link build statements for EXECUTABLE target csc458_final_project
@@ -69,7 +75,7 @@ build CMakeFiles/csc458_final_project.dir/src/client.cpp.obj: CXX_COMPILER__csc4
 #############################################
 # Link the executable csc458_final_project.exe
 
-build csc458_final_project.exe: CXX_EXECUTABLE_LINKER__csc458_final_project_Debug CMakeFiles/csc458_final_project.dir/src/node.cpp.obj CMakeFiles/csc458_final_project.dir/src/client.cpp.obj
+build csc458_final_project.exe: CXX_EXECUTABLE_LINKER__csc458_final_project_Debug CMakeFiles/csc458_final_project.dir/src/node.cpp.obj CMakeFiles/csc458_final_project.dir/src/client.cpp.obj CMakeFiles/csc458_final_project.dir/tests/test_kv_store.cpp.obj
   FLAGS = -g
   LINK_LIBRARIES = -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = CMakeFiles\csc458_final_project.dir
