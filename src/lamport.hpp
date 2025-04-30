@@ -1,0 +1,11 @@
+/*
+ * File: lamport.hpp
+ * Creator: Yuesong Huang
+ * Email (NetID): yhu116@u.rochester.edu
+ * Date: 2025/4/30
+ * Contributor: N/A
+*/
+#ifndef LAMPORT_HPP
+#define LAMPORT_HPP
+
+#endif //LAMPORT_HPP
