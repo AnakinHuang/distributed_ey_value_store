@@ -1,4 +1,13 @@
-C:\Users\85369\AppData\Local\Programs\CLion\bin\cmake\win\x64\bin\cmake.exe -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=C:/Users/85369/AppData/Local/Programs/CLion/bin/ninja/win/x64/ninja.exe -G Ninja -S C:\Users\85369\CLionProjects\csc458_final_project -B C:\Users\85369\CLionProjects\csc458_final_project\cmake-build-debug
--- Configuring done (0.2s)
--- Generating done (0.0s)
--- Build files have been written to: C:/Users/85369/CLionProjects/csc458_final_project/cmake-build-debug
+/Users/yuesong.huang/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "Unix Makefiles" -S /Users/yuesong.huang/CLionProjects/csc458_final_project -B /Users/yuesong.huang/CLionProjects/csc458_final_project/cmake-build-debug
+-- Configuring done (0.0s)
+CMake Error at CMakeLists.txt:6 (add_executable):
+  Cannot find source file:
+
+    <<<<<<<
+
+
+CMake Error at CMakeLists.txt:6 (add_executable):
+  No SOURCES given to target: csc458_final_project
+
+
+CMake Generate step failed.  Build files cannot be regenerated correctly.

@@ -10,31 +10,48 @@
 #include "../src/kv_store.hpp"
 #include "../src/message.hpp"
 
-int main() {
+#include <cassert>
+#include "../src/kv_store.hpp"
+#include "../src/message.hpp"
+
+int main()
+{
     KVStore store;
 
-    // Prepare a MULTICAST_OP message
+    // Initially, no data
+    assert(store.get("key1").empty());
+
+    // Create a multicast operation message
     Message msg;
     msg.type = MessageType::MULTICAST_OP;
-    msg.key = "foo";
-    msg.value = "bar";
-    msg.timestamp = 1;
-    msg.client_id = "client1";
-    msg.replica_id = "replica1";
     msg.op_id = "op1";
+    msg.key = "key1";
+    msg.value = "value1";
 
-    // Applying should not immediately update the store
+    // Apply operation (pending)
     store.apply(msg);
-    assert(store.get("foo").empty());
+    // Before commit, get should still be empty
+    assert(store.get("key1").empty());
 
-    // Committing should make the value available
+    // Commit operation
     store.commit("op1");
-    assert(store.get("foo") == "bar");
+    // After commit, get should return the value
+    assert(store.get("key1") == "value1");
 
-    // Committing a non-existent op should be a no-op
+    // Committing non-existent op should not break
     store.commit("nonexistent");
-    assert(store.get("foo") == "bar");
+    assert(store.get("key1") == "value1");
 
-    std::cout << "[PASS] KVStore apply/commit tests" << std::endl;
+    // Apply multiple operations
+    Message msg2 = msg;
+    msg2.op_id = "op2";
+    msg2.key = "key2";
+    msg2.value = "value2";
+    store.apply(msg2);
+    // Only op2 pending
+    assert(store.get("key2").empty());
+    store.commit("op2");
+    assert(store.get("key2") == "value2");
+
     return 0;
 }

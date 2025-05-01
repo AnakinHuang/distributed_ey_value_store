@@ -4,84 +4,193 @@
  * Email (NetID): yhu116@u.rochester.edu
  * Date: 2025/4/30
  * Contributor: N/A
-*/
+ */
+
 #include <iostream>
-#include <thread>
-#include <cstring>
-#include <unistd.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include <vector>
+#include <unordered_set>
+#include <unordered_map>
+#include <csignal>
 #include "message.hpp"
+#include "lamport.hpp"
+#include "kv_store.hpp"
+#include "network.hpp"
 
-using namespace std;
+static bool running = true;
+// Map operation_id (replica-level) to client info (node_id, client_op_id)
+static std::unordered_map<std::string, std::pair<std::string, std::string>> op_client_map;
+// Track acknowledgments per operation
+static std::unordered_map<std::string, std::unordered_set<std::string>> ack_tracker;
+// Track which ops have been committed
+static std::unordered_set<std::string> committed_ops;
+// Record dynamic quorum size per op_id
+static std::unordered_map<std::string, int> op_quorum_size;
 
-constexpr int BUFFER_SIZE = 1024;
-
-void start_server(int port) {
-    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = INADDR_ANY;
-
-    bind(server_fd, (sockaddr*)&addr, sizeof(addr));
-    listen(server_fd, 5);
-
-    cout << "[Server] Listening on port " << port << endl;
-
-    while (true) {
-        sockaddr_in client_addr{};
-        socklen_t client_len = sizeof(client_addr);
-        int client_fd = accept(server_fd, (sockaddr*)&client_addr, &client_len);
-
-        char buffer[BUFFER_SIZE] = {0};
-        read(client_fd, buffer, BUFFER_SIZE);
-        Message msg = Message::deserialize(buffer);
-        cout << "[Server] Received: " << buffer << endl;
-        close(client_fd);
-    }
+void handle_sigint(int)
+{
+    running = false;
 }
 
-void send_message(const string& ip, int port, const Message& msg) {
-    int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-    sockaddr_in server_addr{};
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(port);
-    inet_pton(AF_INET, ip.c_str(), &server_addr.sin_addr);
-
-    connect(sock_fd, (sockaddr*)&server_addr, sizeof(server_addr));
-    string serialized = msg.serialize();
-    send(sock_fd, serialized.c_str(), serialized.size(), 0);
-    cout << "[Client] Sent: " << serialized << endl;
-    close(sock_fd);
-}
-
-int main(const int argc, char* argv[]) {
-    if (argc != 4) {
-        cerr << "Usage: ./node <node_id> <listen_port> <target_port>\n";
+int main(int argc, char* argv[])
+{
+    if (argc != 3)
+    {
+        std::cerr << "Usage: " << argv[0] << " <replica_id> <config_file>\n";
         return 1;
     }
+    std::string replica_id = argv[1];
+    std::string config_file = argv[2];
 
-    const int node_id = stoi(argv[1]);
-    int listen_port = stoi(argv[2]);
-    const int target_port = stoi(argv[3]);
+    // Networking initialization
+    std::vector<std::string> peers;
+    int listen_port;
+    network::init(replica_id, config_file, peers, listen_port);
+    std::signal(SIGINT, handle_sigint);
 
-    thread server_thread(start_server, listen_port);
+    LamportClock clock;
+    KVStore store;
 
-    // Allow server to start
-    sleep(1);
+    while (running)
+    {
+        Message msg;
+        network::receive_message(msg, /*timeout_ms=*/5000);
+        std::cout << "[" << replica_id << "] RECEIVED type=" << (int)msg.type
+            << " key=" << msg.key << " op=" << msg.op_id << " from="
+            << msg.replica_id << "\n";
 
-    // Example: send a PUT message to the other node
-    Message msg;
-    msg.op_type = "PUT";
-    msg.key = "x";
-    msg.value = "42";
-    msg.lamport_ts = 1;
-    msg.sender_id = node_id;
-    msg.op_id = "op123";
+        switch (msg.type)
+        {
+        case MessageType::PUT_REQUEST:
+            {
+                // Capture original client info
+                std::string client_node = msg.client_id;
+                std::string client_op = msg.op_id;
 
-    send_message("127.0.0.1", target_port, msg);
+                // Assign Lamport timestamp and new replica op_id
+                uint64_t ts = clock.tick();
+                std::string rep_op = replica_id + ":" + std::to_string(ts);
 
-    server_thread.join();
+                // Update message for multicast
+                msg.type = MessageType::MULTICAST_OP;
+                msg.replica_id = replica_id;
+                msg.timestamp = ts;
+                msg.op_id = rep_op;
+
+                // Record mapping for client ack
+                op_client_map[rep_op] = {client_node, client_op};
+
+                // Apply locally so origin also has the update pending
+                store.apply(msg);
+                // Self-ACK for origin
+                ack_tracker[rep_op].insert(replica_id);
+
+                // Dynamic quorum: count live replicas (including self)
+                int live_count = 1;
+
+                // Multicast to other peers
+                for (const auto& peer : peers)
+                {
+                    if (network::send_message(peer, msg))
+                    {
+                        live_count++;
+                    }
+                    else
+                    {
+                        std::cerr << "[" << replica_id << "] Peer down, excluding "
+                            << peer << " from quorum";
+                    }
+                }
+                op_quorum_size[rep_op] = live_count;
+                break;
+            }
+        case MessageType::MULTICAST_OP:
+            {
+                // Apply multicast op
+                clock.update(msg.timestamp);
+                store.apply(msg);
+
+                // Send ACK back to origin
+                Message ack;
+                ack.type = MessageType::ACK;
+                ack.op_id = msg.op_id;
+                ack.replica_id = replica_id;
+                ack.timestamp = clock.tick();
+                std::string origin = network::get_addr(msg.replica_id);
+                if (!origin.empty()) network::send_message(origin, ack);
+                break;
+            }
+        case MessageType::ACK:
+            {
+                // Add ack
+                auto& acks = ack_tracker[msg.op_id];
+                acks.insert(msg.replica_id);
+
+                // Check dynamic quorum for this op
+                int needed = op_quorum_size[msg.op_id] / 2 + 1;
+                if (!committed_ops.count(msg.op_id) && (int)acks.size() >= needed)
+                {
+                    committed_ops.insert(msg.op_id);
+
+                    // Broadcast COMMIT to replicas
+                    Message commit;
+                    commit.type = MessageType::COMMIT;
+                    commit.op_id = msg.op_id;
+                    commit.timestamp = clock.tick();
+                    for (const auto& peer : peers)
+                    {
+                        network::send_message(peer, commit);
+                    }
+                    // Local commit
+                    store.commit(msg.op_id);
+
+                    // Send COMMIT-ack to client (using original client op_id)
+                    auto it = op_client_map.find(msg.op_id);
+                    if (it != op_client_map.end())
+                    {
+                        const auto& [cnode, cop] = it->second;
+                        std::string client_addr = network::get_addr(cnode);
+                        Message cack;
+                        cack.type = MessageType::COMMIT;
+                        cack.op_id = cop;
+                        cack.timestamp = clock.tick();
+                        std::cout << "[" << replica_id << "] Sending COMMIT to client "
+                            << client_addr << " for client_op=" << cop << "\n";
+                        if (!client_addr.empty()) network::send_message(client_addr, cack);
+                    }
+                }
+                break;
+            }
+        case MessageType::COMMIT:
+            {
+                if (committed_ops.insert(msg.op_id).second)
+                {
+                    store.commit(msg.op_id);
+                }
+                break;
+            }
+        case MessageType::GET_REQUEST:
+            {
+                // Handle GET
+                std::string val = store.get(msg.key);
+                Message resp;
+                resp.type = MessageType::GET_RESPONSE;
+                resp.op_id = msg.op_id;
+                resp.key = msg.key;
+                resp.value = val;
+                resp.client_id = msg.client_id;
+                resp.timestamp = clock.tick();
+                std::string client_addr = network::get_addr(msg.client_id);
+                std::cout << "[" << replica_id << "] Replying GET_RESPONSE to "
+                    << client_addr << "='" << val << "'\n";
+                if (!client_addr.empty()) network::send_message(client_addr, resp);
+                break;
+            }
+        default:
+            std::cerr << "[" << replica_id << "] Unknown message type\n";
+        }
+    }
+
+    network::shutdown();
+    std::cout << "Node " << replica_id << " shutting down.\n";
     return 0;
 }

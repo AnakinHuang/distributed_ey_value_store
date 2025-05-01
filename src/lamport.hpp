@@ -12,17 +12,22 @@
 #include <cstdint>
 
 // Thread-safe Lamport logical clock
-class LamportClock {
+class LamportClock
+{
 public:
-    LamportClock() : counter(0) {}
+    LamportClock() : counter(0)
+    {
+    }
 
     // Get the next timestamp for a local event
-    uint64_t tick() {
+    uint64_t tick()
+    {
         return ++counter;
     }
 
     // Update the clock based on a received timestamp and return the new time
-    uint64_t update(uint64_t received) {
+    uint64_t update(uint64_t received)
+    {
         uint64_t current = counter.load();
         uint64_t new_time = (received > current ? received : current) + 1;
         counter.store(new_time);
@@ -30,7 +35,8 @@ public:
     }
 
     // Peek at the current clock value
-    uint64_t read() const {
+    uint64_t read() const
+    {
         return counter.load();
     }
 

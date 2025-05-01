@@ -1,26 +1,38 @@
-CXX := g++
-CXXFLAGS := -std=c++20 -Wall -Wextra -pthread -Isrc
-SRC := $(wildcard src/*.cpp)
-OBJ := $(SRC:src/%.cpp=build/%.o)
-TESTS := tests/test_node tests/test_client
+CXX      := g++
+CXXFLAGS := -std=c++20 -Wall -Wextra -pthread -I./src
 
-all: client node
+# Paths
+SRC_DIR := src
+TEST_DIR := tests
 
-client: src/client.cpp $(OBJ)
-	$(CXX) $(CXXFLAGS) $< -o $@
+# Source files
+NODE_SRCS := $(SRC_DIR)/node.cpp $(SRC_DIR)/network.cpp
+CLIENT_SRCS := $(SRC_DIR)/client.cpp $(SRC_DIR)/network.cpp
 
-node: src/node.cpp $(OBJ)
-	$(CXX) $(CXXFLAGS) $< -o $@
+# Executables
+EXES := node client test_lamport test_kv_store
 
-build/%.o: src/%.cpp
-	mkdir -p build
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+# Default target
+all: node client tests
 
-tests: $(TESTS)
+# Build node (replica)
+node: $(NODE_SRCS)
+	$(CXX) $(CXXFLAGS) $^ -o $@
 
-tests/%: tests/%.cpp node client
-	$(CXX) $(CXXFLAGS) $< ../node ../client -o $@
+# Build client
+client: $(CLIENT_SRCS)
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+# Unit tests (header-only dependencies)
+test_lamport:
+	$(CXX) $(CXXFLAGS) $(TEST_DIR)/test_lamport.cpp -o $@
+
+test_kv_store:
+	$(CXX) $(CXXFLAGS) $(TEST_DIR)/test_kv_store.cpp -o $@
+
+.PHONY: tests
+tests: test_lamport test_kv_store
 
 .PHONY: clean
 clean:
-	rm -rf build node client $(TESTS)
+	rm -f $(EXES)
