@@ -119,7 +119,7 @@ Ensure all tests pass to verify the correctness of the implementation.
 
 ## 👥 Contributors
 
-- **Yuesong Huang (Anakin Huang)** – [yhu116@u.rochester.edu](mailto:yhu116@u.rochester.edu)
+- **Yuesong Huang (Anakin Huang)** (yhu116@u.rochester.edu)
 
 ---
 
