@@ -1,6 +1,6 @@
 # Distributed Key-Value Store
 
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![License: BSD](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)
 
 ## 📖 Overview
 
@@ -125,6 +125,6 @@ Ensure all tests pass to verify the correctness of the implementation.
 
 ## 📄 License
 
-This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
+This project is licensed under the BSD 3-Clause – see the [LICENSE](LICENSE) file for details.
 
 ---
